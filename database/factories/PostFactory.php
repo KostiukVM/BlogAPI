@@ -17,10 +17,15 @@ class PostFactory extends Factory
 
     public function definition(): array
     {
+        $user = User::inRandomOrder()->first();
+
+        if (!$user) {
+            $user = User::factory();
+        }
         return [
             'title' => $this->faker->sentence,
             'content' => $this->faker->paragraph(5),
-            'user_id' => User::factory(),
+            'user_id' => $user,
         ];
     }
 }

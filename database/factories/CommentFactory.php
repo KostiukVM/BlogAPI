@@ -13,7 +13,7 @@ class CommentFactory extends Factory
     public function definition(): array
     {
         return [
-            'user_id' => User::factory(),
+            'user_id' => User::inRandomOrder()->first()->id,
             'content' => $this->faker->sentence,
             'post_id' => null,
         ];
