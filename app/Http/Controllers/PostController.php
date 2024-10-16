@@ -99,35 +99,52 @@ class PostController extends Controller
      *     @OA\RequestBody(
      *         required=true,
      *         @OA\JsonContent(
-     *             required={"title", "content", "user_id"},
+     *             required={"title", "content"},
      *             @OA\Property(property="title", type="string", example="Post Title"),
-     *             @OA\Property(property="content", type="string", example="This is the content of the post."),
-     *             @OA\Property(property="user_id", type="integer", example=1)
+     *             @OA\Property(property="content", type="string", example="This is the content of the post.")
      *         )
      *     ),
-     *     @OA\Response(response="201", description="Post created",
+     *     @OA\Response(
+     *         response="201",
+     *         description="Post created",
      *         @OA\JsonContent(
      *             @OA\Property(property="id", type="integer", example=1),
      *             @OA\Property(property="title", type="string", example="Post Title"),
      *             @OA\Property(property="content", type="string", example="This is the content of the post."),
-     *             @OA\Property(property="user_id", type="integer", example=1),
-     *             @OA\Property(property="created_at", type="string", example="2024-10-10 18:00:00"),
-     *             @OA\Property(property="updated_at", type="string", example="2024-10-10 18:00:00")
+     *             @OA\Property(property="userId", type="integer", example=1),
+     *             @OA\Property(property="createdAt", type="string", example="2024-10-10 18:00:00"),
+     *             @OA\Property(property="updatedAt", type="string", example="2024-10-10 18:00:00")
      *         )
      *     ),
+     *     @OA\Response(response="401", description="Unauthorized"),
      *     @OA\Response(response="422", description="Validation error")
      * )
      */
     public function store(Request $request): JsonResponse
     {
+        $user = $request->user();
+
+        if (!$user) {
+            return response()->json(['message' => 'Unauthorized'], 401);
+        }
+
         $validatedData = $request->validate([
             'title' => 'required|string',
             'content' => 'required|string',
-            'user_id' => 'required|integer',
         ]);
 
+        $validatedData['user_id'] = $user->id;
+
         $post = Post::create($validatedData);
-        return response()->json($post->toCamelCase(), 201);
+
+        return response()->json([
+            'id' => $post->id,
+            'title' => $post->title,
+            'content' => $post->content,
+            'userId' => $post->user_id,
+            'createdAt' => $post->created_at,
+            'updatedAt' => $post->updated_at,
+        ], 201);
     }
 
 
@@ -214,16 +231,10 @@ class PostController extends Controller
 
     /**
      * @OA\Get(
-     *     path="/api/posts/user/{id}",
+     *     path="/api/posts/user",
      *     tags={"Posts"},
-     *     summary="Get posts of a user by user ID with comments count",
-     *     @OA\Parameter(
-     *         name="id",
-     *         in="path",
-     *         required=true,
-     *         description="ID of the user to fetch posts for",
-     *         @OA\Schema(type="integer")
-     *     ),
+     *     summary="Get posts of the authenticated user with comments count",
+     *     security={{"bearerAuth": {}}},
      *     @OA\Response(
      *         response="200",
      *         description="List of user posts with comments count",
@@ -234,24 +245,38 @@ class PostController extends Controller
      *             @OA\Property(property="userId", type="integer", example=1),
      *             @OA\Property(property="createdAt", type="string", example="2024-10-10 18:00:00"),
      *             @OA\Property(property="updatedAt", type="string", example="2024-10-10 18:00:00"),
-     *             @OA\Property(property="commentsCount", type="integer", example=5)
+     *             @OA\Property(property="commentsCount", type="integer", example=5),
+     *             @OA\Property(property="comments", type="array", @OA\Items(
+     *                 @OA\Property(property="id", type="integer", example=1),
+     *                 @OA\Property(property="content", type="string", example="Nice post!"),
+     *                 @OA\Property(property="userId", type="integer", example=2),
+     *                 @OA\Property(property="createdAt", type="string", example="2024-10-12 09:00:00")
+     *             ))
      *         ))
      *     ),
-     *     @OA\Response(response="404", description="User not found"),
-     *     @OA\Response(response="422", description="Validation error")
+     *     @OA\Response(response="401", description="Unauthorized")
      * )
      */
-    public function userPosts($id): JsonResponse
+    public function userPosts(Request $request): JsonResponse
     {
-        $posts = Post::where('user_id', $id)
+        $user = $request->user();
+
+        if (!$user) {
+            return response()->json(['message' => 'Unauthorized'], 401);
+        }
+
+        $posts = Post::where('user_id', $user->id)
             ->withCount('comments')
-            ->with(['comments'])
+            ->with('comments')
             ->get()
             ->map(function ($post) {
                 return [
                     'id' => $post->id,
                     'title' => $post->title,
                     'content' => $post->content,
+                    'userId' => $post->user_id,
+                    'createdAt' => $post->created_at,
+                    'updatedAt' => $post->updated_at,
                     'commentsCount' => $post->comments_count,
                     'comments' => $post->comments->map(function ($comment) {
                         return [

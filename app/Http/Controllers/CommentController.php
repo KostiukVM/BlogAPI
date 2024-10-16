@@ -79,13 +79,14 @@ class CommentController extends Controller
      *     @OA\RequestBody(
      *         required=true,
      *         @OA\JsonContent(
-     *             required={"content", "post_id", "user_id"},
+     *             required={"content", "post_id"},
      *             @OA\Property(property="content", type="string", example="This is a comment."),
-     *             @OA\Property(property="postId", type="integer", example=1),
-     *             @OA\Property(property="userId", type="integer", example=1)
+     *             @OA\Property(property="postId", type="integer", example=1)
      *         )
      *     ),
-     *     @OA\Response(response="201", description="Comment created",
+     *     @OA\Response(
+     *         response="201",
+     *         description="Comment created",
      *         @OA\JsonContent(
      *             @OA\Property(property="id", type="integer", example=1),
      *             @OA\Property(property="postId", type="integer", example=1),
@@ -100,19 +101,29 @@ class CommentController extends Controller
      */
     public function store(Request $request): JsonResponse
     {
-        $request->merge([
-            'post_id' => $request->input('postId'),
-            'user_id' => $request->input('userId'),
-        ]);
+        $user = $request->user();
+
+        if (!$user) {
+            return response()->json(['message' => 'Unauthorized'], 401);
+        }
 
         $validatedData = $request->validate([
             'content' => 'required|string|min:1',
             'post_id' => 'required|integer|exists:posts,id',
-            'user_id' => 'required|integer|exists:users,id',
         ]);
 
+        $validatedData['user_id'] = $user->id;
+
         $comment = Comment::create($validatedData);
-        return response()->json($comment->toCamelCase(), 201);
+
+        return response()->json([
+            'id' => $comment->id,
+            'postId' => $comment->post_id,
+            'content' => $comment->content,
+            'userId' => $comment->user_id,
+            'createdAt' => $comment->created_at,
+            'updatedAt' => $comment->updated_at,
+        ], 201);
     }
 
     /**

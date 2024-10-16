@@ -69,9 +69,10 @@ class AuthController extends Controller
         if ($request->user()) {
             $request->user()->currentAccessToken()->delete();
             return response()->json(['message' => 'Logout successful'], 200);
+        } else {
+            return response()->json(['message' => 'Unauthorized'], 401);
         }
 
-        return response()->json(['message' => 'Unauthorized'], 401);
     }
 
     /**
